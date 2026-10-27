@@ -10,11 +10,11 @@ import BaseButton from '../components/ui/BaseButton.vue';
 import { monthlyReport, downloadExport } from '../services/reports';
 import { listCategories } from '../services/categories';
 import { apiErrorMessage } from '../services/api';
-import { formatDate, formatMoney } from '../utils/formatters';
+import { currentMonth, formatDate, formatMoney } from '../utils/formatters';
 import type { Category, MonthlyReport } from '../types';
 import { PAYMENT_METHOD_OPTIONS } from '../types';
 
-const period = ref(new Date().toISOString().slice(0, 7));
+const period = ref(currentMonth());
 const report = ref<MonthlyReport | null>(null);
 const categories = ref<Category[]>([]);
 const loading = ref(true);

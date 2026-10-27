@@ -10,6 +10,8 @@ export interface ExpenseFilters {
     payment_method?: string;
     date_from?: string;
     date_to?: string;
+    year?: number;
+    month?: number;
     amount_min?: number;
     amount_max?: number;
     sort?: string;

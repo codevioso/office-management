@@ -7,14 +7,14 @@ import LoadingState from '../components/ui/LoadingState.vue';
 import BaseButton from '../components/ui/BaseButton.vue';
 import { getDashboard } from '../services/dashboard';
 import { apiErrorMessage } from '../services/api';
-import { formatDate, formatMoney, formatMonth } from '../utils/formatters';
+import { currentMonth, formatDate, formatMoney, formatMonth } from '../utils/formatters';
 import type { DashboardData, FinancialSummary } from '../types';
 import ExpenseFormDialog from '../components/expenses/ExpenseFormDialog.vue';
 import { useAuthStore } from '../stores/auth';
 
 const auth = useAuthStore();
 const dashboard = ref<DashboardData | null>(null);
-const selectedMonth = ref(new Date().toISOString().slice(0, 7));
+const selectedMonth = ref(currentMonth());
 const loading = ref(true);
 const error = ref('');
 const expenseFormOpen = ref(false);

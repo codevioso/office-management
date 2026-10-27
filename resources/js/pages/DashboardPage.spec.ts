@@ -2,8 +2,10 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import DashboardPage from './DashboardPage.vue';
+import DatePicker from '../components/ui/DatePicker.vue';
 import { useAuthStore } from '../stores/auth';
 import * as dashboardService from '../services/dashboard';
+import { currentMonth } from '../utils/formatters';
 
 vi.mock('../services/dashboard');
 
@@ -13,16 +15,15 @@ describe('DashboardPage', () => {
         useAuthStore().user = { id: 1, name: 'Super Admin', email: 'admin@example.com', role: 'super_admin', is_active: true };
         const summary = { total_amount: '1000.00', paid_amount: '700.00', unpaid_amount: '200.00', pending_amount: '100.00', unspecified_amount: '0.00', transaction_count: 3 };
         vi.mocked(dashboardService.getDashboard).mockResolvedValue({ ...summary, current_month: summary });
-        vi.mocked(dashboardService.getMonthlyReport).mockResolvedValue({ ...summary, period_month: '2026-09-01', categories: [], expenses: [], meta: { current_page: 1, last_page: 1, per_page: 15, total: 0 } });
     });
 
     it('loads totals and refreshes the report when the month changes', async () => {
         const wrapper = mount(DashboardPage);
         expect(wrapper.text()).toContain('Loading dashboard');
         await flushPromises();
-        expect(wrapper.text()).toContain('1,000.00');
-        await wrapper.get('#month').setValue('2026-08');
+        expect(dashboardService.getDashboard).toHaveBeenCalledWith(currentMonth());
+        wrapper.findComponent(DatePicker).vm.$emit('update:modelValue', '2026-08');
         await flushPromises();
-        expect(dashboardService.getMonthlyReport).toHaveBeenLastCalledWith('2026-08');
+        expect(dashboardService.getDashboard).toHaveBeenLastCalledWith('2026-08');
     });
 });

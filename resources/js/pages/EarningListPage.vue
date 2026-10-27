@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { Pencil, Plus, Trash2 } from '@lucide/vue';
 import AppLayout from '../components/layout/AppLayout.vue';
 import BaseDialog from '../components/ui/BaseDialog.vue';
@@ -9,7 +9,7 @@ import LoadingState from '../components/ui/LoadingState.vue';
 import { createEarning, deleteEarning, listEarnings, updateEarning } from '../services/earnings';
 import { apiErrorMessage, validationErrors } from '../services/api';
 import { useToast } from '../composables/useToast';
-import { formatDate, formatMoney } from '../utils/formatters';
+import { currentMonth, formatDate, formatMoney, monthDateRange } from '../utils/formatters';
 import type { Earning, EarningPayload, PaginationMeta, ValidationErrors } from '../types';
 
 const toast = useToast();
@@ -22,7 +22,7 @@ const formError = ref('');
 const formErrors = ref<ValidationErrors>({});
 const formOpen = ref(false);
 const editing = ref<Earning | null>(null);
-const filters = reactive({ search: '', source: '', date_from: '', date_to: '' });
+const filters = reactive({ search: '', source: '', month: currentMonth() });
 const today = new Date();
 const todayDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 const form = reactive<EarningPayload>({ earning_date: todayDate, source: '', description: '', amount: 0, reference: null, note: null });
@@ -34,7 +34,13 @@ const showingTo = computed(() => Math.min(meta.value.current_page * meta.value.p
 async function load(page = 1): Promise<void> {
     loading.value = true;
     try {
-        const response = await listEarnings({ ...filters, page, per_page: meta.value.per_page });
+        const response = await listEarnings({
+            search: filters.search || undefined,
+            source: filters.source || undefined,
+            ...monthDateRange(filters.month),
+            page,
+            per_page: meta.value.per_page,
+        });
         rows.value = response.data;
         meta.value = response.meta;
         error.value = '';
@@ -79,6 +85,12 @@ async function remove(row: Earning): Promise<void> {
     catch (caught) { error.value = apiErrorMessage(caught); }
 }
 
+let searchTimer: number | undefined;
+watch([() => filters.search, () => filters.source], () => {
+    window.clearTimeout(searchTimer);
+    searchTimer = window.setTimeout(() => load(), 350);
+});
+watch(() => filters.month, () => { window.clearTimeout(searchTimer); load(); });
 onMounted(load);
 </script>
 
@@ -88,13 +100,11 @@ onMounted(load);
             <div><p class="text-sm font-medium text-brand-700">Finance</p><h1 class="mt-1 text-3xl font-semibold">Earnings</h1><p class="mt-1 text-sm text-slate-500">Admin-only company revenue records.</p></div>
             <BaseButton @click="startCreate"><Plus class="size-4" />Add earning</BaseButton>
         </div>
-        <form class="card mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4" @submit.prevent="load()">
+        <section class="card mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             <label><span class="label">Search</span><input v-model="filters.search" class="field" placeholder="Search descriptions or references" /></label>
             <label><span class="label">Source</span><input v-model="filters.source" class="field" placeholder="Filter by earning source" /></label>
-            <label><span class="label">From</span><DatePicker v-model="filters.date_from" placeholder="Start date" /></label>
-            <label><span class="label">To</span><DatePicker v-model="filters.date_to" placeholder="End date" /></label>
-            <div class="flex gap-2"><BaseButton type="submit">Filter</BaseButton><BaseButton type="button" variant="secondary" @click="Object.assign(filters, { search: '', source: '', date_from: '', date_to: '' }); load()">Clear</BaseButton></div>
-        </form>
+            <label><span class="label">Month</span><DatePicker v-model="filters.month" mode="month" aria-label="Month" /></label>
+        </section>
         <p v-if="error" class="mt-5 rounded-lg bg-red-50 p-3 text-red-700">{{ error }}</p>
         <LoadingState v-if="loading" label="Loading earnings…" />
         <section v-else class="mt-6 overflow-hidden rounded-xl border bg-white">

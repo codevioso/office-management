@@ -32,6 +32,11 @@ describe('ExpenseListPage', () => {
         await flushPromises();
         expect(wrapper.text()).toContain('Office internet');
         expect(wrapper.text()).toContain('BDT');
+        const now = new Date();
+        expect(expenseService.listExpenses).toHaveBeenCalledWith(expect.objectContaining({
+            year: now.getFullYear(),
+            month: now.getMonth() + 1,
+        }));
         expect(wrapper.find('[aria-label="Delete expense"]').exists()).toBe(false);
         expect(wrapper.find('[aria-label="Edit expense"]').exists()).toBe(false);
     });

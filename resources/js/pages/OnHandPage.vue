@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { HandCoins, Pencil, Plus, Trash2, Wallet, ReceiptText } from '@lucide/vue';
 import AppLayout from '../components/layout/AppLayout.vue';
 import BaseDialog from '../components/ui/BaseDialog.vue';
@@ -9,7 +9,7 @@ import LoadingState from '../components/ui/LoadingState.vue';
 import { createOnHandReceipt, deleteOnHandReceipt, listOnHandReceipts, updateOnHandReceipt } from '../services/onHand';
 import { apiErrorMessage, validationErrors } from '../services/api';
 import { useToast } from '../composables/useToast';
-import { formatDate, formatMoney } from '../utils/formatters';
+import { currentMonth, formatDate, formatMoney, monthDateRange } from '../utils/formatters';
 import type { OnHandReceipt, OnHandReceiptPayload, OnHandSummary, PaginationMeta, ValidationErrors } from '../types';
 
 const toast = useToast();
@@ -23,7 +23,7 @@ const formError = ref('');
 const formErrors = ref<ValidationErrors>({});
 const formOpen = ref(false);
 const editing = ref<OnHandReceipt | null>(null);
-const filters = reactive({ date_from: '', date_to: '' });
+const filters = reactive({ month: currentMonth() });
 const today = new Date();
 const todayDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 const form = reactive<OnHandReceiptPayload>({ received_date: todayDate, amount: 0, note: null });
@@ -41,7 +41,7 @@ const showingTo = computed(() => Math.min(meta.value.current_page * meta.value.p
 async function load(page = 1): Promise<void> {
     loading.value = true;
     try {
-        const response = await listOnHandReceipts({ ...filters, page, per_page: meta.value.per_page });
+        const response = await listOnHandReceipts({ ...monthDateRange(filters.month), page, per_page: meta.value.per_page });
         rows.value = response.data;
         meta.value = response.meta;
         summary.value = response.summary;
@@ -87,6 +87,7 @@ async function remove(row: OnHandReceipt): Promise<void> {
     catch (caught) { error.value = apiErrorMessage(caught); }
 }
 
+watch(() => filters.month, () => load());
 onMounted(load);
 </script>
 
@@ -99,11 +100,9 @@ onMounted(load);
         <div class="mt-6 grid gap-4 sm:grid-cols-3">
             <article v-for="stat in stats" :key="stat.label" class="card min-w-0"><div class="flex min-w-0 items-start justify-between gap-3"><div class="min-w-0"><p class="text-sm text-slate-500">{{ stat.label }}</p><p class="mt-2 break-words text-xl font-semibold tracking-tight tabular-nums sm:text-2xl" :class="stat.valueTone">{{ stat.value }}</p></div><span class="shrink-0 rounded-lg p-2" :class="stat.tone"><component :is="stat.icon" class="size-5" /></span></div></article>
         </div>
-        <form class="card mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3" @submit.prevent="load()">
-            <label><span class="label">From</span><DatePicker v-model="filters.date_from" placeholder="Start date" /></label>
-            <label><span class="label">To</span><DatePicker v-model="filters.date_to" placeholder="End date" /></label>
-            <div class="flex items-end gap-2"><BaseButton type="submit">Filter</BaseButton><BaseButton type="button" variant="secondary" @click="Object.assign(filters, { date_from: '', date_to: '' }); load()">Clear</BaseButton></div>
-        </form>
+        <section class="card mt-6">
+            <label class="block max-w-xs"><span class="label">Month</span><DatePicker v-model="filters.month" mode="month" aria-label="Month" /></label>
+        </section>
         <p v-if="error" class="mt-5 rounded-lg bg-red-50 p-3 text-red-700">{{ error }}</p>
         <LoadingState v-if="loading" label="Loading received money…" />
         <section v-else class="mt-6 overflow-hidden rounded-xl border bg-white">

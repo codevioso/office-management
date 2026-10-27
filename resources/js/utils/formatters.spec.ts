@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { formatDate, formatDateTime, formatMoney, formatMonth } from './formatters';
+import { currentMonth, formatDate, formatDateTime, formatMoney, formatMonth, monthDateRange } from './formatters';
 
 describe('formatters', () => {
     it('keeps date-only values on their original calendar date', () => {
         expect(formatDate('2026-09-17')).toBe('17 Sept 2026');
+    });
+
+    it('builds the current month and its first and last dates', () => {
+        expect(currentMonth(new Date(2026, 9, 27))).toBe('2026-10');
+        expect(monthDateRange('2026-10')).toEqual({ date_from: '2026-10-01', date_to: '2026-10-31' });
+        expect(monthDateRange('2024-02')).toEqual({ date_from: '2024-02-01', date_to: '2024-02-29' });
     });
 
     it('formats reporting months and Bangladeshi taka amounts', () => {

@@ -1,3 +1,18 @@
+export function currentMonth(date = new Date()): string {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+export function monthDateRange(period: string): { date_from: string; date_to: string } {
+    const [year, month] = period.split('-').map(Number);
+    const lastDay = new Date(year, month, 0).getDate();
+    const paddedMonth = String(month).padStart(2, '0');
+
+    return {
+        date_from: `${year}-${paddedMonth}-01`,
+        date_to: `${year}-${paddedMonth}-${String(lastDay).padStart(2, '0')}`,
+    };
+}
+
 export function formatMoney(value: string | number): string {
     return new Intl.NumberFormat('en-BD', {
         style: 'currency', currency: 'BDT', minimumFractionDigits: 2,

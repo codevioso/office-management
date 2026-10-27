@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import AppLayout from '../components/layout/AppLayout.vue';
 import BaseButton from '../components/ui/BaseButton.vue';
 import LoadingState from '../components/ui/LoadingState.vue';
@@ -8,21 +8,28 @@ import { listAuditLogs } from '../services/audit';
 import { listCategories } from '../services/categories';
 import { listUsers } from '../services/users';
 import { apiErrorMessage } from '../services/api';
-import { formatDateTime } from '../utils/formatters';
+import { currentMonth, formatDateTime, monthDateRange } from '../utils/formatters';
 import { presentAuditLog } from '../utils/auditPresentation';
 import type { AuditLog, Category, PaginationMeta, User } from '../types';
 
 const logs = ref<AuditLog[]>([]); const users = ref<User[]>([]); const categories = ref<Category[]>([]);
 const meta = ref<PaginationMeta>({ current_page: 1, last_page: 1, per_page: 20, total: 0 });
 const loading = ref(true); const error = ref('');
-const filters = reactive({ action: '', actor_user_id: '', subject_type: '', date_from: '', date_to: '' });
+const filters = reactive({ action: '', actor_user_id: '', subject_type: '', month: currentMonth() });
 const pageNumbers = computed(() => Array.from({ length: meta.value.last_page }, (_, index) => index + 1)
     .filter((page) => Math.abs(page - meta.value.current_page) <= 2));
 const showingFrom = computed(() => meta.value.total === 0 ? 0 : (meta.value.current_page - 1) * meta.value.per_page + 1);
 const showingTo = computed(() => Math.min(meta.value.current_page * meta.value.per_page, meta.value.total));
 const entries = computed(() => logs.value.map((log) => ({ log, ...presentAuditLog(log, users.value, categories.value) })));
-async function load(page=1): Promise<void> { loading.value = true; try { const response = await listAuditLogs({ page, ...Object.fromEntries(Object.entries(filters).filter(([,v]) => v)) }); logs.value = response.data; meta.value = response.meta; error.value=''; } catch(e) { error.value=apiErrorMessage(e); } finally { loading.value=false; } }
-function clearFilters(): void { Object.assign(filters, { action: '', actor_user_id: '', subject_type: '', date_from: '', date_to: '' }); load(); }
+async function load(page=1): Promise<void> {
+    loading.value = true;
+    const { month, ...rest } = filters;
+    try { const response = await listAuditLogs({ page, ...Object.fromEntries(Object.entries({ ...rest, ...monthDateRange(month) }).filter(([,v]) => v)) }); logs.value = response.data; meta.value = response.meta; error.value=''; }
+    catch(e) { error.value=apiErrorMessage(e); }
+    finally { loading.value=false; }
+}
+function clearFilters(): void { Object.assign(filters, { action: '', actor_user_id: '', subject_type: '', month: currentMonth() }); load(); }
+watch(() => filters.month, () => load());
 onMounted(async () => { try { users.value = await listUsers(); } catch { users.value = []; } try { categories.value = await listCategories(); } catch { categories.value = []; } await load(); });
 </script>
 <template>
@@ -31,8 +38,7 @@ onMounted(async () => { try { users.value = await listUsers(); } catch { users.v
             <label><span class="label">User</span><select v-model="filters.actor_user_id" class="field"><option value="">All users</option><option v-for="user in users" :key="user.id" :value="String(user.id)">{{ user.name }}</option></select></label>
             <label><span class="label">Action</span><input v-model="filters.action" class="field" placeholder="expense.updated" /></label>
             <label><span class="label">Entity</span><select v-model="filters.subject_type" class="field"><option value="">All entities</option><option>Expense</option><option>User</option><option>Category</option><option>Attachment</option><option>ImportBatch</option></select></label>
-            <label><span class="label">From</span><DatePicker v-model="filters.date_from" aria-label="From date" placeholder="From" /></label>
-            <label><span class="label">To</span><DatePicker v-model="filters.date_to" aria-label="To date" placeholder="To" :min-date="filters.date_from || undefined" /></label>
+            <label><span class="label">Month</span><DatePicker v-model="filters.month" mode="month" aria-label="Month" /></label>
             <div class="flex items-end gap-2"><BaseButton type="submit">Filter</BaseButton><BaseButton type="button" variant="secondary" @click="clearFilters">Clear</BaseButton></div>
         </form>
         <p v-if="error" class="mt-5 rounded-lg bg-red-50 p-3 text-red-700">{{ error }}</p><LoadingState v-if="loading" label="Loading audit log…" />

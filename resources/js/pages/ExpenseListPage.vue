@@ -14,7 +14,7 @@ import { downloadExport } from '../services/reports';
 import { apiErrorMessage } from '../services/api';
 import { useAuthStore } from '../stores/auth';
 import { useToast } from '../composables/useToast';
-import { formatDate, formatMoney } from '../utils/formatters';
+import { currentMonth, formatDate, formatMoney } from '../utils/formatters';
 import type { Category, Expense, PaginationMeta } from '../types';
 import { PAYMENT_METHOD_OPTIONS } from '../types';
 import ExpenseFormDialog from '../components/expenses/ExpenseFormDialog.vue';
@@ -26,8 +26,7 @@ const loading = ref(true); const error = ref(''); const selected = ref<Expense |
 const detailOpen = ref(false); const deleteOpen = ref(false); const deleting = ref(false);
 const formOpen = ref(false); const editingExpenseId = ref<number | null>(null);
 const filters = reactive({
-    search: '', category_id: '', payment_method: '', date_from: '', date_to: '',
-    amount_min: '', amount_max: '', sort: 'expense_date', direction: 'desc' as 'asc' | 'desc',
+    search: '', category_id: '', payment_method: '', month: currentMonth(),
 });
 let searchTimer: number | undefined;
 const pageNumbers = computed(() => Array.from({ length: meta.value.last_page }, (_, index) => index + 1)
@@ -45,24 +44,20 @@ async function load(page = 1): Promise<void> {
 }
 
 function activeFilters() {
+    const [year, month] = filters.month.split('-').map(Number);
+
     return {
-            search: filters.search || undefined,
-            category_id: Number(filters.category_id) || undefined,
-            payment_method: filters.payment_method || undefined,
-            date_from: filters.date_from || undefined, date_to: filters.date_to || undefined,
-            amount_min: Number(filters.amount_min) || undefined, amount_max: Number(filters.amount_max) || undefined,
-            sort: filters.sort, direction: filters.direction,
-        };
+        search: filters.search || undefined,
+        category_id: Number(filters.category_id) || undefined,
+        payment_method: filters.payment_method || undefined,
+        year: Number.isInteger(year) ? year : undefined,
+        month: Number.isInteger(month) ? month : undefined,
+    };
 }
 
 async function exportExpenses(): Promise<void> {
     try { await downloadExport('/exports/expenses.xlsx', activeFilters(), 'filtered-expenses.xlsx'); }
     catch (caught) { toast.show('Unable to export expenses', 'error', apiErrorMessage(caught)); }
-}
-
-function clearFilters(): void {
-    Object.assign(filters, { search: '', category_id: '', payment_method: '', date_from: '', date_to: '', amount_min: '', amount_max: '', sort: 'expense_date', direction: 'desc' });
-    load();
 }
 
 function showDetails(expense: Expense): void { selected.value = expense; detailOpen.value = true; }
@@ -84,27 +79,19 @@ async function remove(): Promise<void> {
 }
 
 watch(() => filters.search, () => { window.clearTimeout(searchTimer); searchTimer = window.setTimeout(() => load(), 350); });
-watch([
-    () => filters.category_id, () => filters.payment_method,
-    () => filters.date_from, () => filters.date_to, () => filters.amount_min, () => filters.amount_max,
-    () => filters.sort, () => filters.direction,
-], () => load());
+watch([() => filters.category_id, () => filters.payment_method, () => filters.month], () => load());
 onMounted(async () => { try { categories.value = await listCategories(); } catch { categories.value = []; } await load(); });
 </script>
 <template>
     <AppLayout>
         <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p class="text-sm font-medium text-brand-700">Management</p><h1 class="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">Expenses</h1><p class="mt-1 text-sm text-slate-500">{{ meta.total }} recorded expenses</p></div><div class="flex flex-wrap gap-2"><BaseButton variant="secondary" @click="exportExpenses"><Download class="size-4" />Export Excel</BaseButton><BaseButton @click="startCreate"><Plus class="size-4" />Add expense</BaseButton></div></div>
         <section class="card mt-6">
-            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-8">
-                <label class="relative xl:col-span-2"><span class="sr-only">Search expenses</span><Search class="pointer-events-none absolute left-3 top-3.5 size-4 text-slate-400" /><input v-model="filters.search" class="field mt-0 pl-9" placeholder="Search descriptions" /></label>
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <label class="relative"><span class="sr-only">Search expenses</span><Search class="pointer-events-none absolute left-3 top-3.5 size-4 text-slate-400" /><input v-model="filters.search" class="field mt-0 pl-9" placeholder="Search descriptions" /></label>
                 <select v-model="filters.category_id" class="field mt-0" aria-label="Category"><option value="">All categories</option><option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option></select>
                 <select v-model="filters.payment_method" class="field mt-0" aria-label="Payment method"><option value="">All payment methods</option><option v-for="method in PAYMENT_METHOD_OPTIONS" :key="method" :value="method">{{ method }}</option></select>
-                <DatePicker v-model="filters.date_from" class="mt-0" aria-label="From date" placeholder="From" />
-                <DatePicker v-model="filters.date_to" class="mt-0" aria-label="To date" placeholder="To" :min-date="filters.date_from || undefined" />
-                <input v-model="filters.amount_min" type="number" min="0" step="0.01" class="field mt-0" aria-label="Minimum amount" placeholder="Minimum amount" />
-                <input v-model="filters.amount_max" type="number" min="0" step="0.01" class="field mt-0" aria-label="Maximum amount" placeholder="Maximum amount" />
+                <DatePicker v-model="filters.month" mode="month" class="mt-0" aria-label="Month" />
             </div>
-            <div class="mt-3 flex flex-wrap items-center gap-3"><select v-model="filters.sort" class="field mt-0 w-auto" aria-label="Sort by"><option value="expense_date">Date</option><option value="amount">Amount</option><option value="description">Description</option></select><select v-model="filters.direction" class="field mt-0 w-auto" aria-label="Sort direction"><option value="desc">Descending</option><option value="asc">Ascending</option></select><button class="text-sm font-medium text-brand-700" @click="clearFilters">Clear filters</button></div>
         </section>
         <div v-if="error" class="card mt-6 text-center"><p class="text-red-700">{{ error }}</p><BaseButton class="mt-4" @click="load(meta.current_page)">Try again</BaseButton></div>
         <LoadingState v-else-if="loading" label="Loading expenses…" />
